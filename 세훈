@@ -1,0 +1,243 @@
+let bullets = [];
+let enemies = [];
+let score = 0;
+let gameOver = false;
+let spaceshipImg;
+let level = 1;
+let enemiesSpeed = 2;
+let imageLoaded = false;
+
+function preload() {
+  setTimeout(() => {
+    spaceshipImg = loadImage(
+      'https://www.pngkey.com/png/detail/859-8599169_galaga-galaga-ship.png',
+      () => {
+        console.log('Image loaded successfully');
+        imageLoaded = true;
+        loop(); // 이미지 로드 후 게임 루프 시작
+      },
+      () => {
+        console.error('Failed to load image');
+        createDefaultSpaceshipImage();
+        imageLoaded = true;
+        loop(); // 기본 이미지 생성 후 게임 루프 시작
+      }
+    );
+  }, 2000); // 2초 지연
+}
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  initializeEnemies();
+  noLoop(); // 이미지 로드 전까지 게임 루프 중지
+}
+
+function draw() {
+  if (!imageLoaded) {
+    background(0);
+    fill(255);
+    textSize(32);
+    textAlign(CENTER, CENTER);
+    text('Loading...', width / 2, height / 2);
+    return;
+  }
+
+  if (gameOver) {
+    displayGameOver();
+    return;
+  }
+
+  drawBackground(); // 배경을 매 프레임마다 그리기
+
+  // 우주선 그리기
+  drawSpaceship(mouseX, height - 50);
+
+  // 총알 그리기 및 이동
+  for (let bullet of bullets) {
+    bullet.move();
+    bullet.display();
+  }
+
+  // 적 객체 그리기 및 이동
+  for (let enemy of enemies) {
+    enemy.move();
+    enemy.display();
+    if (enemy.y > height) {
+      gameOver = true;
+    }
+  }
+
+  // 충돌 감지
+  checkCollisions();
+
+  // 모든 적을 맞췄는지 확인
+  if (enemies.length === 0) {
+    nextLevel();
+  }
+
+  // 점수 표시
+  displayScore();
+}
+
+function drawBackground() {
+  background(0); // 검정색 배경
+
+  // 별 그리기
+  for (let i = 0; i < 100; i++) {
+    let x = random(width);
+    let y = random(height);
+    let size = random(1, 3);
+    fill(255);
+    noStroke();
+    ellipse(x, y, size, size);
+  }
+}
+
+function drawSpaceship(x, y) {
+  if (spaceshipImg) {
+    imageMode(CENTER);
+    image(spaceshipImg, x, y, 40, 40); // 이미지 크기를 40x40으로 조정
+  } else {
+    fill(255);
+    noStroke();
+    drawCustomSpaceship(x, y); // 기본 삼각형을 꾸민 우주선 그리기
+  }
+}
+
+function createDefaultSpaceshipImage() {
+  spaceshipImg = createGraphics(40, 40);
+  spaceshipImg.fill(255, 0, 0);
+  spaceshipImg.triangle(10, 40, 30, 40, 20, 0); // 메인 삼각형
+  spaceshipImg.fill(255);
+  spaceshipImg.triangle(15, 30, 25, 30, 20, 10); // 내부 삼각형
+  spaceshipImg.fill(0, 0, 255);
+  spaceshipImg.rect(17.5, 20, 5, 10); // 중앙 직사각형
+}
+
+function drawCustomSpaceship(x, y) {
+  push();
+  translate(x, y);
+  fill(255, 0, 0);
+  triangle(-20, 20, 20, 20, 0, -40); // 메인 삼각형
+  fill(255);
+  triangle(-10, 20, 10, 20, 0, -20); // 내부 삼각형
+  fill(0, 0, 255);
+  rect(-5, 0, 10, 20); // 중앙 직사각형
+  pop();
+}
+
+function mousePressed() {
+  if (gameOver) {
+    restartGame();
+  } else if (imageLoaded) {
+    bullets.push(new Bullet(mouseX, height - 50));
+  }
+}
+
+function checkCollisions() {
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    for (let j = enemies.length - 1; j >= 0; j--) {
+      if (bullets[i].hits(enemies[j])) {
+        enemies.splice(j, 1);
+        bullets.splice(i, 1);
+        score += 10;
+        break;
+      }
+    }
+  }
+}
+
+function displayScore() {
+  fill(255);
+  textSize(24);
+  text(`Score: ${score}`, 10, 30);
+  text(`Level: ${level}`, 10, 60);
+}
+
+function displayGameOver() {
+  fill(255, 0, 0);
+  textSize(48);
+  textAlign(CENTER, CENTER);
+  text('Game Over', width / 2, height / 2);
+  textSize(24);
+  text('Click to Restart', width / 2, height / 2 + 50);
+}
+
+function restartGame() {
+  score = 0;
+  level = 1;
+  enemiesSpeed = 2;
+  gameOver = false;
+  bullets = [];
+  initializeEnemies();
+  loop();
+}
+
+function nextLevel() {
+  level++;
+  enemiesSpeed += 0.5; // 속도 증가 비율을 줄임
+  initializeEnemies();
+}
+
+function initializeEnemies() {
+  enemies = [];
+  for (let i = 0; i < 10; i++) {
+    enemies.push(new Enemy(random(width), random(-height, 0), enemiesSpeed, getEnemyColor()));
+  }
+}
+
+function getEnemyColor() {
+  switch (level) {
+    case 1:
+      return color(0, 255, 0); // 초록색
+    case 2:
+      return color(255, 0, 0); // 빨간색
+    case 3:
+      return color(0, 0, 255); // 파란색
+    default:
+      return color(255, 255, 0); // 노란색
+  }
+}
+
+class Bullet {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.r = 5;
+  }
+
+  move() {
+    this.y -= 5;
+  }
+
+  display() {
+    fill(255, 0, 0);
+    noStroke();
+    ellipse(this.x, this.y, this.r * 2);
+  }
+
+  hits(enemy) {
+    let d = dist(this.x, this.y, enemy.x, enemy.y);
+    return d < this.r + enemy.r;
+  }
+}
+
+class Enemy {
+  constructor(x, y, speed, color) {
+    this.x = x;
+    this.y = y;
+    this.r = 20;
+    this.speed = speed;
+    this.color = color;
+  }
+
+  move() {
+    this.y += this.speed;
+  }
+
+  display() {
+    fill(this.color);
+    noStroke();
+    ellipse(this.x, this.y, this.r * 2);
+  }
+}
